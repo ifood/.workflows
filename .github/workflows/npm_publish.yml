@@ -1,0 +1,54 @@
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      bump_type: 
+        type: string
+        default: minor
+        required: false
+    secrets:
+      NPM_DEPLOY_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Config Git
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'yarn'
+
+      - name: Install
+        run: yarn --frozen-lockfile
+        
+      - name: Build
+        run: yarn build
+
+      - name: Release
+        run: | 
+          if [[ -f ".release-it.json" ]]; then
+            yarn release-it --ci ${{ inputs.bump_type }}
+          elif [[ -f "lerna.json" ]]; then
+            lerna version ${{ inputs.bump_type }} --yes --conventional-commits --create-release github --message "chore(release): Release new version" --no-push
+            lerna publish from-package --yes
+            git push --force --follow-tags --no-verify origin main
+          else
+            echo 'Missing .release-it.json or lerna.json configuration files.' ; exit 1; 
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_DEPLOY_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

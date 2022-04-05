@@ -1,0 +1,49 @@
+name: Page deploy
+
+on:
+  workflow_call:
+    inputs:
+      directory: 
+        type: string
+        default: ./website
+        required: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'yarn'
+
+      - name: Install Website
+        working-directory: ${{ inputs.directory }}
+        run: yarn --frozen-lockfile
+      
+      - name: Build website
+        working-directory: ${{ inputs.directory }}
+        run: yarn build
+
+      - name: Cache Build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ./lib
+            ./example/build
+          key: build-${{ github.sha }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ inputs.directory }}/build
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
